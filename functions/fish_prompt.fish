@@ -1,73 +1,64 @@
 # Default appearance options. Override in config.fish if you want.
-if ! set -q lucid_dirty_indicator
-    set -g lucid_dirty_indicator "•"
+if ! set -q dirty_indicator
+    set -g dirty_indicator "*"
 end
 
-if ! set -q lucid_prompt_symbol
-    set -g lucid_prompt_symbol "❯"
+if ! set -q prompt_symbol
+    set -g prompt_symbol ">"
 end
 
-if ! set -q lucid_prompt_symbol_error
-    set -g lucid_prompt_symbol_error "❯"
+if ! set -q prompt_symbol_color
+    set -g prompt_symbol_color magenta
 end
 
-if ! set -q lucid_prompt_symbol_color
-    set -g lucid_prompt_symbol_color "$fish_color_normal"
+if ! set -q prompt_symbol_error_color
+    set -g prompt_symbol_error_color grey
 end
 
-if ! set -q lucid_prompt_symbol_error_color
-    set -g lucid_prompt_symbol_error_color "$fish_color_normal"
+if ! set -q cwd_color
+    set -g cwd_color brcyan
 end
 
-# This should be set to be at least as long as lucid_dirty_indicator, due to a fish bug
-if ! set -q lucid_clean_indicator
-    set -g lucid_clean_indicator (string replace -r -a '.' ' ' $lucid_dirty_indicator)
-end
-
-if ! set -q lucid_cwd_color
-    set -g lucid_cwd_color green
-end
-
-if ! set -q lucid_git_color
-    set -g lucid_git_color blue
+if ! set -q git_color
+    set -g git_color green
 end
 
 # State used for memoization and async calls.
-set -g __lucid_cmd_id 0
-set -g __lucid_git_state_cmd_id -1
-set -g __lucid_git_static ""
-set -g __lucid_dirty ""
+set -g __cmd_id 0
+set -g __git_state_cmd_id -1
+set -g __git_static ""
+set -g __dirty ""
 
 # Increment a counter each time a prompt is about to be displayed.
 # Enables us to distingish between redraw requests and new prompts.
-function __lucid_increment_cmd_id --on-event fish_prompt
-    set __lucid_cmd_id (math $__lucid_cmd_id + 1)
+function __increment_cmd_id --on-event fish_prompt
+    set __cmd_id (math $__cmd_id + 1)
 end
 
 # Abort an in-flight dirty check, if any.
-function __lucid_abort_check
-    if set -q __lucid_check_pid
-        set -l pid $__lucid_check_pid
-        functions -e __lucid_on_finish_$pid
+function __abort_check
+    if set -q __check_pid
+        set -l pid $__check_pid
+        functions -e __on_finish_$pid
         command kill $pid >/dev/null 2>&1
-        set -e __lucid_check_pid
+        set -e __check_pid
     end
 end
 
-function __lucid_git_status
+function __git_status
     # Reset state if this call is *not* due to a redraw request
-    set -l prev_dirty $__lucid_dirty
-    if test $__lucid_cmd_id -ne $__lucid_git_state_cmd_id
-        __lucid_abort_check
+    set -l prev_dirty $__dirty
+    if test $__cmd_id -ne $__git_state_cmd_id
+        __abort_check
 
-        set __lucid_git_state_cmd_id $__lucid_cmd_id
-        set __lucid_git_static ""
-        set __lucid_dirty ""
+        set __git_state_cmd_id $__cmd_id
+        set __git_static ""
+        set __dirty ""
     end
 
     # Fetch git position & action synchronously.
     # Memoize results to avoid recomputation on subsequent redraws.
-    if test -z $__lucid_git_static
+    if test -z $__git_static
         # Determine git working directory
         set -l git_dir (command git --no-optional-locks rev-parse --absolute-git-dir 2>/dev/null)
         if test $status -ne 0
@@ -98,12 +89,12 @@ function __lucid_git_status
             set state "$state <$action>"
         end
 
-        set -g __lucid_git_static $state
+        set -g __git_static $state
     end
 
     # Fetch dirty status asynchronously.
-    if test -z $__lucid_dirty
-        if ! set -q __lucid_check_pid
+    if test -z $__dirty
+        if ! set -q __check_pid
             # Compose shell command to run in background
             set -l check_cmd "git --no-optional-locks status -unormal --porcelain --ignore-submodules 2>/dev/null | head -n1 | count"
             set -l cmd "if test ($check_cmd) != "0"; exit 1; else; exit 0; end"
@@ -113,31 +104,31 @@ function __lucid_git_status
                 # This is to prevent a race between the child process exiting before we can get set up.
                 block -l
 
-                set -g __lucid_check_pid 0
+                set -g __check_pid 0
                 command fish --private --command "$cmd" >/dev/null 2>&1 &
                 set -l pid (jobs --last --pid)
 
-                set -g __lucid_check_pid $pid
+                set -g __check_pid $pid
 
                 # Use exit code to convey dirty status to parent process.
-                function __lucid_on_finish_$pid --inherit-variable pid --on-process-exit $pid
-                    functions -e __lucid_on_finish_$pid
+                function __on_finish_$pid --inherit-variable pid --on-process-exit $pid
+                    functions -e __on_finish_$pid
 
-                    if set -q __lucid_check_pid
-                        if test $pid -eq $__lucid_check_pid
+                    if set -q __check_pid
+                        if test $pid -eq $__check_pid
                             switch $argv[3]
                                 case 0
-                                    set -g __lucid_dirty_state 0
+                                    set -g __dirty_state 0
                                     if status is-interactive
                                         commandline -f repaint
                                     end
                                 case 1
-                                    set -g __lucid_dirty_state 1
+                                    set -g __dirty_state 1
                                     if status is-interactive
                                         commandline -f repaint
                                     end
                                 case '*'
-                                    set -g __lucid_dirty_state 2
+                                    set -g __dirty_state 2
                                     if status is-interactive
                                         commandline -f repaint
                                     end
@@ -148,29 +139,27 @@ function __lucid_git_status
             end
         end
 
-        if set -q __lucid_dirty_state
-            switch $__lucid_dirty_state
-                case 0
-                    set -g __lucid_dirty $lucid_clean_indicator
+        if set -q __dirty_state
+            switch $__dirty_state
                 case 1
-                    set -g __lucid_dirty $lucid_dirty_indicator
+                    set -g __dirty $dirty_indicator
                 case 2
-                    set -g __lucid_dirty "<err>"
+                    set -g __dirty "<err>"
             end
 
-            set -e __lucid_check_pid
-            set -e __lucid_dirty_state
+            set -e __check_pid
+            set -e __dirty_state
         end
     end
 
     # Render git status. When in-progress, use previous state to reduce flicker.
-    set_color $lucid_git_color
-    echo -n $__lucid_git_static ''
+    set_color $git_color
+    echo -n $__git_static ''
 
-    if ! test -z $__lucid_dirty
-        echo -n $__lucid_dirty
+    if ! test -z $__dirty
+        echo -n $__dirty
     else if ! test -z $prev_dirty
-        set_color --dim $lucid_git_color
+        set_color --dim $git_color
         echo -n $prev_dirty
         set_color normal
     end
@@ -178,64 +167,51 @@ function __lucid_git_status
     set_color normal
 end
 
-function __lucid_vi_indicator
-    if [ $fish_key_bindings = "fish_vi_key_bindings" ]
-        switch $fish_bind_mode
-            case "insert"
-                set_color green
-                echo -n "[I] "
-            case "default"
-                set_color red
-                echo -n "[N] "
-            case "visual"
-                set_color yellow
-                echo -n "[S] "
-            case "replace"
-                set_color blue
-                echo -n "[R] "
-        end
-        set_color normal
-    end
-end
-
-# Suppress default mode prompt
-function fish_mode_prompt
-end
-
 function fish_prompt
     set -l last_pipestatus $pipestatus
     set -l cwd (pwd | string replace "$HOME" '~')
+    set -l prompt_symbol_color "$prompt_symbol_color"
+    printf \e\[0J
 
-    if test -z "$lucid_skip_newline"
+    if not set -e transient_prompt
         echo ''
-    end
+        set_color $cwd_color
+        if test $cwd != '~' -a $cwd != '/'
+            set -l udir (dirname (pwd) | string replace "$HOME" '~')
+            test $udir != '/'; and set udir $udir'/'
+            echo -sn $udir
+        end
+        set_color -o $cwd_color
+        echo -n (basename (prompt_pwd))
+        set_color normal
 
-    set_color $lucid_cwd_color
-    echo -sn $cwd
-    set_color normal
+        if test $cwd != '~'; or test -n "$git_status_in_home_directory"
+            set -l git_state (__git_status)
+            if test $status -eq 0
+                echo -sn " on $git_state"
+            end
+        end
 
-    if test $cwd != '~'; or test -n "$lucid_git_status_in_home_directory"
-        set -l git_state (__lucid_git_status)
-        if test $status -eq 0
-            echo -sn " on $git_state"
+        echo ''
+
+        for status_code in $last_pipestatus
+            if test "$status_code" -ne 0
+                set prompt_symbol_color "$prompt_symbol_error_color"
+                break
+            end
         end
     end
 
-    echo ''
-    __lucid_vi_indicator
-
-    set -l prompt_symbol "$lucid_prompt_symbol"
-    set -l prompt_symbol_color "$lucid_prompt_symbol_color"
-
-    for status_code in $last_pipestatus
-        if test "$status_code" -ne 0
-            set prompt_symbol "$lucid_prompt_symbol_error"
-            set prompt_symbol_color "$lucid_prompt_symbol_error_color"
-            break
-        end
-    end
-
-    set_color "$prompt_symbol_color"
+    set_color -o "$prompt_symbol_color"
     echo -n "$prompt_symbol "
     set_color normal
 end
+
+# Implementation of transient prompt.
+function transient
+    set -g transient_prompt
+    commandline -f repaint
+    commandline -f execute
+end
+
+bind \r transient

@@ -1,5 +1,5 @@
 # Default appearance options. Override in config.fish if you want.
-if ! set -q dirty_indicator
+if ! set -q lucid_dirty_indicator
     set -g dirty_indicator "*"
 end
 
@@ -13,6 +13,10 @@ end
 
 if ! set -q prompt_symbol_error_color
     set -g prompt_symbol_error_color grey
+end
+
+if ! set -q transient_prompt_symbol_color
+    set -g transient_prompt_symbol_color brblue
 end
 
 if ! set -q cwd_color
@@ -200,6 +204,8 @@ function fish_prompt
                 break
             end
         end
+    else
+        set prompt_symbol_color "$transient_prompt_symbol_color"
     end
 
     set_color -o "$prompt_symbol_color"
@@ -207,7 +213,6 @@ function fish_prompt
     set_color normal
 end
 
-# Implementation of transient prompt.
 function transient
     set -g transient_prompt
     commandline -f repaint

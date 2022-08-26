@@ -4,7 +4,7 @@ A fish prompt with pure simplicity and all good stuff from [lucid.fish](https://
 
 The name `translucent` comes from `transient` + `lucid`
 
-![Preview](https://user-images.githubusercontent.com/18751876/186765409-96d58e19-ae4f-42ef-bbdf-3d7dcb0f6f9a.png)
+![Preview](https://user-images.githubusercontent.com/18751876/186891523-a8a5a857-f8d4-4c3e-975e-972b7533a96c.png)
 
 
 ## Features
@@ -35,9 +35,9 @@ Please refer to [lucid.fish](https://github.com/mattgreen/lucid.fish)
 * `git_color`: color used for git information. Default: `blue`
 * `git_status_in_home_directory`: if set, git information is also displayed in the home directory. Default: not set
 * `prompt_symbol`: the prompt symbol. Default: `>`
-* `prompt_symbol_color`: the color of the prompt symbol. Default: `magenta`
+* `prompt_symbol_color`: the color of the prompt symbol. Default: `brmagenta`
 * `prompt_symbol_error_color`: the color of the prompt symbol when an error occurs. Default: `grey`
-* `transient_prompt_symbol_color`: the color of the transient prompt symbol. Default: `brblue`
+* `transient_prompt_symbol_color`: the color of the transient prompt symbol. Default: `magenta`
 
 ## Known Issues
 
